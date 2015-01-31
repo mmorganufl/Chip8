@@ -289,32 +289,112 @@ bool Chip8Processor::Call(uint16_t address)
 
 bool Chip8Processor::SkipValue(uint8_t xRegister, uint8_t value, bool ifEqual)
 {
-    //TODO:  Implement me
-    return false;
+    _pc += 2;
+    bool isEqual = (_v[xRegister] == value);
+    if (isEqual == ifEqual)
+    {
+        _pc += 2;
+    }
+    return true;
 }
 
 bool Chip8Processor::SkipXY(uint8_t xRegister, uint8_t yRegister, bool ifEqual)
 {
-    //TODO:  Implement me
-    return false;
+    _pc += 2;
+    bool isEqual = (_v[xRegister] == _v[yRegister]);
+    if (isEqual == ifEqual)
+    {
+        _pc += 2;
+    }
+    return true;
 }
 
 bool Chip8Processor::SetByValue(uint8_t xRegister, uint8_t value)
 {
-    //TODO:  Implement me
-    return false;
+    _pc += 2;
+    _v[xRegister] = value;
+    return true;
 }
 
 bool Chip8Processor::AddToRegister(uint8_t xRegister, uint8_t value)
 {
-    //TODO:  Implement me
-    return false;
+    _pc += 2;
+    _v[xRegister] = value;
+    return true;
 }
 
 bool Chip8Processor::Math(uint8_t xRegister, uint8_t yRegister, MathCode code)
 {
-    //TODO:  Implement me
-    return false;
+    _pc += 2;
+    switch (code)
+    {
+        case Chip8Processor::MATH_ADD:
+        {
+            uint8_t oldX = _v[xRegister];
+            _v[xRegister] += _v[yRegister];
+            _v[15] = (_v[xRegister] < oldX);
+        }
+        break;
+
+        case Chip8Processor::MATH_AND:
+        {
+            _v[xRegister] &= _v[yRegister];
+        }
+        break;
+
+        case Chip8Processor::MATH_MINUS:
+        {
+            _v[15] = (_v[yRegister] > _v[xRegister]) ? 1 : 0;
+            _v[xRegister] = _v[yRegister] - _v[xRegister];
+        }
+        break;
+
+
+        case Chip8Processor::MATH_OR:
+        {
+            _v[xRegister] |= _v[yRegister];
+        }
+        break;
+
+        case Chip8Processor::MATH_SET:
+        {
+            _v[xRegister] = _v[yRegister];
+        }
+        break;
+
+        case Chip8Processor::MATH_SL:
+        {
+            _v[15] = (_v[xRegister] & 0x80) == 0 ? 0 : 1;
+            _v[xRegister] <<= 1;
+        }
+        break;
+
+        case Chip8Processor::MATH_SR:
+        {
+            _v[15] = (_v[xRegister] & 0x01) == 0 ? 0 : 1;
+            _v[xRegister] >>= 1;
+        }
+        break;
+
+        case Chip8Processor::MATH_SUB:
+        {
+            _v[15] = (v[xRegister] > _v[yRegister]) ? 1 : 0;
+            _v[xRegister] = _v[xRegister] - _v[yRegister];
+        }
+        break;
+
+        case Chip8Processor::MATH_XOR:
+        {
+            _v[xRegister] ^= _v[yRegister];
+        }
+        break;
+
+        default:
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Chip8Processor::SetIRegister(uint16_t value)
