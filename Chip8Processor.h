@@ -9,10 +9,22 @@ namespace chip8
 {
 class Chip8Processor
 {
-    typedef uint8_t Chip8DataRegister;
     static const uint16_t RAM_SIZE = 0x1000;  // 4k
+    static const uint8_t  STACK_SIZE = 16;
     static const uint16_t ROM_OFFSET = 0x200;
 
+    enum MathCode
+    {
+        MATH_SET = 0,
+        MATH_OR = 1,
+        MATH_AND = 2,
+        MATH_XOR = 3,
+        MATH_ADD = 4,
+        MATH_SUB = 5,
+        MATH_SR = 6,
+        MATH_MINUS = 7,
+        MATH_SL = 14
+    };
 public:
     /**
      * Constructor
@@ -59,29 +71,26 @@ public:
     bool IsRunning();
 
 protected:
-    Chip8DataRegister _v0;
-    Chip8DataRegister _v1;
-    Chip8DataRegister _v2;
-    Chip8DataRegister _v3;
-    Chip8DataRegister _v4;
-    Chip8DataRegister _v5;
-    Chip8DataRegister _v6;
-    Chip8DataRegister _v7;
-    Chip8DataRegister _v8;
-    Chip8DataRegister _v9;
-    Chip8DataRegister _vA;
-    Chip8DataRegister _vB;
-    Chip8DataRegister _vC;
-    Chip8DataRegister _vD;
-    Chip8DataRegister _vE;
-    Chip8DataRegister _vF;
+    // Registers
+    uint8_t  _v[16];
+
+    // Program counter
     uint16_t _pc;
+
+    // Stack pointer
     uint16_t _sp;
+
+    // I register
     uint16_t _I;
+
+    // Timers
     uint16_t _delayTimer;
     uint16_t _soundTimer;
-    uint8_t _RAM[RAM_SIZE];
 
+    uint8_t  _RAM[RAM_SIZE];
+    uint16_t _stack[STACK_SIZE];
+
+    // True when execution thread is running
     bool            _run;
     std::mutex      _runLock;
     std::thread*    _runThread;
@@ -90,6 +99,30 @@ protected:
     bool HandleInstruction(uint16_t instruction);
     void ExecutionThread();
     void TimerThread();
+
+    // Instructions
+    bool ClearScreen();
+    bool Return();
+    bool Jump(uint16_t address);
+    bool Call(uint16_t address);
+    bool SkipValue(uint8_t xRegister, uint8_t value, bool ifEqual);
+    bool SkipXY(uint8_t xRegister, uint8_t yRegister, bool ifEqual);
+    bool SetByValue(uint8_t xRegister, uint8_t value);
+    bool AddToRegister(uint8_t xRegister, uint8_t value);
+    bool Math(uint8_t xRegister, uint8_t yRegister, MathCode code);
+    bool SetIRegister(uint16_t value);
+    bool SetRandom(uint8_t xRegister, uint8_t mask);
+    bool DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t sizeInBytes);
+    bool SkipKeyPress(uint8_t xRegister, bool ifIsPressed);
+    bool StoreDelayTimer(uint8_t xRegister);
+    bool WaitAndStoreKey(uint8_t xRegister);
+    bool SetDelayTimer(uint8_t xRegister);
+    bool SetSoundTimer(uint8_t xRegister);
+    bool AddToI(uint8_t xRegister);
+    bool SetIToChar(uint8_t xRegister);
+    bool StoreBCD(uint8_t xRegister);
+    bool StoreRegs(uint8_t xRegister);
+    bool FillRegs(uint8_t xRegister);
 };
 }
 #endif /* CHIP8PROCESSOR_H_ */

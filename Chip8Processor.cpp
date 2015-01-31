@@ -1,5 +1,10 @@
 #include "Chip8Processor.h"
-#include <thread>
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
+
+#define LOG(...) fprintf(stderr, __VA_ARGS__)
+
 namespace chip8
 {
 
@@ -31,25 +36,10 @@ bool Chip8Processor::Reset()
 {
     Stop();
 
-    _v0 = 0;
-    _v1 = 0;
-    _v2 = 0;
-    _v3 = 0;
-    _v4 = 0;
-    _v5 = 0;
-    _v6 = 0;
-    _v7 = 0;
-    _v8 = 0;
-    _v9 = 0;
-    _vA = 0;
-    _vB = 0;
-    _vC = 0;
-    _vD = 0;
-    _vE = 0;
-    _vF = 0;
+    memset(_v, sizeof(_v), 0);
     _I = 0;
     _pc = Chip8Processor::ROM_OFFSET;
-    _sp = Chip8Processor::RAM_SIZE - 2;
+    _sp = Chip8Processor::STACK_SIZE;
     _delayTimer = 0;
     _soundTimer = 0;
 
@@ -93,6 +83,7 @@ void Chip8Processor::ExecutionThread()
     while(_run)
     {
         uint16_t instruction = _RAM[_pc];
+        LOG("pc = %4x", _pc);
         HandleInstruction(instruction);
     }
     return;
@@ -100,6 +91,308 @@ void Chip8Processor::ExecutionThread()
 
 bool Chip8Processor::HandleInstruction(uint16_t instruction)
 {
+    LOG("%s", __FUNCTION__);
+    uint8_t firstNibble = instruction & 0xF000;
 
+    uint8_t xRegister = (instruction & 0x0F00) >> 8;
+    uint8_t yRegister = (instruction & 0x00F0) >> 4;
+
+    switch (firstNibble)
+    {
+        case 0:
+        {
+            if (instruction == 0x00E0)
+            {
+                return ClearScreen();
+            }
+            else if (instruction == 0x0EE)
+            {
+                return Return();
+            }
+        }
+        break;
+
+        case 1:
+        case 11:
+        {
+            uint8_t offset = (firstNibble == 1) ? 0 : _v[0];
+            uint16_t address = (instruction & 0x0FFF) + offset;
+            return Jump(address);
+        }
+        break;
+
+        case 2:
+        {
+            return Call(instruction & 0x0FFF);
+        }
+        break;
+
+        case 3:
+        case 4:
+        {
+            uint8_t value = (instruction & 0x00FF);
+            return SkipValue(xRegister, value, (firstNibble == 3));
+        }
+        break;
+
+        case 5:
+        case 9:
+        {
+            if ((instruction & 0x000F) != 0)
+            {
+                return false;
+            }
+            return SkipXY(xRegister, yRegister, (firstNibble == 5));
+        }
+        break;
+
+        case 6:
+        {
+            uint8_t value = (instruction & 0x00FF);
+            return SetByValue(xRegister, value);
+        }
+        break;
+
+        case 7:
+        {
+            uint8_t value = (instruction & 0x00FF);
+            return AddToRegister(xRegister, value);
+        }
+        break;
+
+        case 8:
+        {
+            Chip8Processor::MathCode code = (Chip8Processor::MathCode)(instruction & 0x000F);
+            return Math(xRegister, yRegister, code);
+        }
+        break;
+
+        case 10:
+        {
+            return SetIRegister(instruction & 0x0FFF);
+        }
+        break;
+
+        case 12:
+        {
+            uint8_t mask = (instruction & 0x00FF);
+            return SetRandom(xRegister, mask);
+        }
+        break;
+
+        case 13:
+        {
+            uint8_t size = (instruction & 0x000F);
+            return DrawSprite(xRegister, yRegister, size);
+        }
+        break;
+
+        default:
+        {
+            switch (instruction & 0xF0FF)
+            {
+                case 0xE09E:
+                case 0xE0A1:
+                {
+                    return SkipKeyPress(xRegister, (instruction & 0xF0FF) == 0xE09E);
+                }
+                break;
+
+                case 0xF007:
+                {
+                    return StoreDelayTimer(xRegister);
+                }
+                break;
+
+                case 0xF00A:
+                {
+                    return WaitAndStoreKey(xRegister);
+                }
+                break;
+
+                case 0xF015:
+                {
+                    return SetDelayTimer(xRegister);
+                }
+                break;
+
+                case 0xF018:
+                {
+                    return SetSoundTimer(xRegister);
+                }
+                break;
+
+                case 0xF01E:
+                {
+                    return AddToI(xRegister);
+                }
+                break;
+
+                case 0xF029:
+                {
+                    return SetIToChar(xRegister);
+                }
+                break;
+
+                case 0xF033:
+                {
+                    return StoreBCD(xRegister);
+                }
+                break;
+
+                case 0xF055:
+                {
+                    return StoreRegs(xRegister);
+                }
+                break;
+
+                case 0xF065:
+                {
+                    return FillRegs(xRegister);
+                }
+                break;
+            }
+        }
+        break;
+    }
+    LOG("No instruction handled");
+    return false;
 }
+
+// Instructions
+bool Chip8Processor::ClearScreen()
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::Return()
+{
+    _pc = _stack[_sp];
+    _sp++;
+    return (_sp >= Chip8Processor::STACK_SIZE);
+}
+
+bool Chip8Processor::Jump(uint16_t address)
+{
+    _pc = address;
+    return true;
+}
+
+bool Chip8Processor::Call(uint16_t address)
+{
+    _sp--;
+    _stack[_sp] = _pc + 2;
+    _pc = address;
+    return (_sp >= 0);
+}
+
+bool Chip8Processor::SkipValue(uint8_t xRegister, uint8_t value, bool ifEqual)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SkipXY(uint8_t xRegister, uint8_t yRegister, bool ifEqual)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetByValue(uint8_t xRegister, uint8_t value)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::AddToRegister(uint8_t xRegister, uint8_t value)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::Math(uint8_t xRegister, uint8_t yRegister, MathCode code)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetIRegister(uint16_t value)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetRandom(uint8_t xRegister, uint8_t mask)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t sizeInBytes)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SkipKeyPress(uint8_t xRegister, bool ifIsPressed)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::StoreDelayTimer(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::WaitAndStoreKey(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetDelayTimer(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetSoundTimer(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::AddToI(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::SetIToChar(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::StoreBCD(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::StoreRegs(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
+bool Chip8Processor::FillRegs(uint8_t xRegister)
+{
+    //TODO:  Implement me
+    return false;
+}
+
 }
