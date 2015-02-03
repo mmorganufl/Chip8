@@ -4,32 +4,40 @@
 #include <stdint.h>
 #include <thread>
 #include <mutex>
+#include <random>
+#include <vector>
+#include <bitset>
 
 namespace chip8
 {
+    class Keyboard;
+    class Display;
+    class Beeper;
+
 class Chip8Processor
 {
-    static const uint16_t RAM_SIZE = 0x1000;  // 4k
-    static const uint8_t  STACK_SIZE = 16;
-    static const uint16_t ROM_OFFSET = 0x200;
+    static const uint16_t RAM_SIZE      = 0x1000;  // 4k
+    static const uint16_t ROM_OFFSET    = 0x200;
+    static const uint16_t STACK_OFFSET  = 0xF00;
+    static const uint8_t  STACK_DEPTH   = 16;
 
     enum MathCode
     {
-        MATH_SET = 0,
-        MATH_OR = 1,
-        MATH_AND = 2,
-        MATH_XOR = 3,
-        MATH_ADD = 4,
-        MATH_SUB = 5,
-        MATH_SR = 6,
-        MATH_MINUS = 7,
-        MATH_SL = 14
+        MATH_SET    = 0,
+        MATH_OR     = 1,
+        MATH_AND    = 2,
+        MATH_XOR    = 3,
+        MATH_ADD    = 4,
+        MATH_SUB    = 5,
+        MATH_SR     = 6,
+        MATH_MINUS  = 7,
+        MATH_SL     = 14
     };
 public:
     /**
      * Constructor
      */
-    Chip8Processor();
+    Chip8Processor(Keyboard* keyboard, Display* display, Beeper* beeper);
 
     /**
      * Destructor
@@ -57,6 +65,12 @@ public:
      * @return Returns true if the processor is started
      */
     bool Run();
+
+    /**
+     * Executes the instruction at PC and increments the PC accordingly
+     * @return True if the instruction was successfully executed
+     */
+    bool Step();
 
     /**
      * Stops program execution
@@ -88,13 +102,16 @@ protected:
     uint16_t _soundTimer;
 
     uint8_t  _RAM[RAM_SIZE];
-    uint16_t _stack[STACK_SIZE];
 
     // True when execution thread is running
-    bool            _run;
-    std::mutex      _runLock;
-    std::thread*    _runThread;
-    std::thread*    _timerThread;
+    bool                _run;
+    std::mutex          _runLock;
+    std::thread*        _runThread;
+    std::thread*        _timerThread;
+    Keyboard*           _keyboard;
+    Display*            _display;
+    Beeper*             _beeper;
+    std::random_device  _rand;
 
     bool HandleInstruction(uint16_t instruction);
     void ExecutionThread();
