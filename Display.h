@@ -31,6 +31,8 @@ namespace chip8
         bool FlipPixel(uint8_t x, uint8_t y);
 
     protected:
+        void DrawBorder();
+
         std::bitset<DISP_WIDTH> _pixels[DISP_HEIGHT];
         WINDOW* _win;
     };

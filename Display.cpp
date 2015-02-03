@@ -8,13 +8,9 @@ Display::Display()
     initscr();
     cbreak();
     noecho();
+    curs_set(0);
     _win = newwin(DISP_HEIGHT+2, DISP_WIDTH+2, 0, 0);
-    wborder(_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
-    touchwin(_win);
-    refresh();
-    wrefresh(_win);
-
-
+    DrawBorder();
 }
 
 Display::~Display()
@@ -22,9 +18,18 @@ Display::~Display()
     endwin();
 }
 
+void Display::DrawBorder()
+{
+    wborder(_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+    touchwin(_win);
+    refresh();
+    wrefresh(_win);
+}
+
 void Display::Clear()
 {
-    //TODO:  implement me
+    wclear(_win);
+    DrawBorder();
 }
 
 bool Display::FlipPixel(uint8_t x, uint8_t y)

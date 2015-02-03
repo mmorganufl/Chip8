@@ -31,6 +31,10 @@ int main()
             case 'd':
                 x++;
                 break;
+
+            case 'c':
+                disp->Clear();
+                continue;
         }
         disp->FlipPixel(x, y);
     }
