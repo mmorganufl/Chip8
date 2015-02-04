@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <bitset>
+#include <thread>
 #include <ncurses.h>
 
 namespace chip8
@@ -10,7 +11,7 @@ namespace chip8
     class Display
     {
         static const uint8_t  DISP_WIDTH    = 64;
-        static const uint8_t  DISP_HEIGHT   = 128;
+        static const uint8_t  DISP_HEIGHT   = 32;
 
     public:
         Display();
@@ -32,9 +33,12 @@ namespace chip8
 
     protected:
         void DrawBorder();
-
+        void RefreshThread();
         std::bitset<DISP_WIDTH> _pixels[DISP_HEIGHT];
-        WINDOW* _win;
+        WINDOW*                 _win;
+        bool                    _refreshRun;
+        std::thread*            _refreshThread;
+
     };
 
 } /* namespace chip8 */

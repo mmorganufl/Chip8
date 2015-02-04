@@ -1,3 +1,4 @@
+#include "log.h"
 #include "Chip8Processor.h"
 #include "Display.h"
 #include "Keyboard.h"
@@ -8,8 +9,8 @@
 #include <stdarg.h>
 #include <chrono>
 
-#define LOG(...) fprintf(stderr, __VA_ARGS__)
-
+#define LOG_TAG "Chip8Processor"
+#include "log.h"
 namespace chip8
 {
 
@@ -51,8 +52,10 @@ Chip8Processor::~Chip8Processor()
 
 bool Chip8Processor::LoadRom(const uint8_t* src, uint16_t length)
 {
+    LOG("%s: %d", __FUNCTION__, length);
     if (length > (Chip8Processor::RAM_SIZE - Chip8Processor::ROM_OFFSET))
     {
+        LOG("Length is too long: %d", length);
         return false;
     }
 
@@ -60,6 +63,7 @@ bool Chip8Processor::LoadRom(const uint8_t* src, uint16_t length)
     {
         _RAM[i + Chip8Processor::ROM_OFFSET] = src[i];
     }
+    LOG("ROM Loaded!");
     return true;
 }
 
@@ -80,11 +84,13 @@ bool Chip8Processor::Reset()
 bool Chip8Processor::Run()
 {
     _runLock.lock();
+    LOG("Got lock");
     if (!_run)
     {
-        _runThread = new std::thread(&Chip8Processor::ExecutionThread, this);
-        _timerThread = new std::thread(&Chip8Processor::TimerThread, this);
         _run = true;
+        _runThread = new std::thread(&Chip8Processor::ExecutionThread, this);
+        LOG("Execution thread started");
+        _timerThread = new std::thread(&Chip8Processor::TimerThread, this);
     }
     _runLock.unlock();
     return _run;
@@ -115,6 +121,7 @@ bool Chip8Processor::IsRunning()
 
 void Chip8Processor::ExecutionThread()
 {
+    LOG("Starting execution thread");
     while(_run)
     {
         if (!Step())
@@ -122,6 +129,8 @@ void Chip8Processor::ExecutionThread()
             LOG("The instruction failed to execute properly");
             return;
         }
+        std::chrono::microseconds period(10);
+        std::this_thread::sleep_for(period);
     }
     return;
 }
@@ -129,14 +138,19 @@ void Chip8Processor::ExecutionThread()
 bool Chip8Processor::Step()
 {
     uint16_t instruction = _RAM[_pc];
-    LOG("pc = %4x", _pc);
+    instruction <<= 8;
+    instruction += _RAM[_pc+1];
+
+    LOG("pc = 0x%x", _pc);
     return HandleInstruction(instruction);
 }
 
 void Chip8Processor::TimerThread()
 {
+    LOG("Starting timer thread");
     while(_run)
     {
+        _timerLock.lock();
         _delayTimer--;
         if (_delayTimer <= 0)
         {
@@ -149,7 +163,7 @@ void Chip8Processor::TimerThread()
             _soundTimer = 0;
             _beeper->StopBeeping();
         }
-
+        _timerLock.unlock();
         std::chrono::microseconds period(16666);
         std::this_thread::sleep_for(period);
     }
@@ -158,12 +172,13 @@ void Chip8Processor::TimerThread()
 
 bool Chip8Processor::HandleInstruction(uint16_t instruction)
 {
-    LOG("%s", __FUNCTION__);
-    uint8_t firstNibble = instruction & 0xF000;
+    LOG("%s: %x", __FUNCTION__, instruction);
+    uint8_t firstNibble = ((instruction & 0xF000) >> 12);
 
     uint8_t xRegister = (instruction & 0x0F00) >> 8;
     uint8_t yRegister = (instruction & 0x00F0) >> 4;
 
+    LOG("xRegister: %x, yRegister: %x", xRegister, yRegister);
     _pc += 2;
     switch (firstNibble)
     {
@@ -173,7 +188,7 @@ bool Chip8Processor::HandleInstruction(uint16_t instruction)
             {
                 return ClearScreen();
             }
-            else if (instruction == 0x0EE)
+            else if (instruction == 0x00EE)
             {
                 return Return();
             }
@@ -345,14 +360,14 @@ bool Chip8Processor::Return()
 
 bool Chip8Processor::Jump(uint16_t address)
 {
-    LOG("%s: %u", __FUNCTION__, address);
+    LOG("%s: %x", __FUNCTION__, address);
     _pc = address;
     return true;
 }
 
 bool Chip8Processor::Call(uint16_t address)
 {
-    LOG("%s: %u", __FUNCTION__, address);
+    LOG("%s: %x", __FUNCTION__, address);
     _sp -= 2;
     *((uint16_t*)(_RAM + _sp)) = _pc + 2;
     _pc = address;
@@ -392,7 +407,7 @@ bool Chip8Processor::SetByValue(uint8_t xRegister, uint8_t value)
 bool Chip8Processor::AddToRegister(uint8_t xRegister, uint8_t value)
 {
     LOG("%s: V%u, %u", __FUNCTION__, xRegister, value);
-    _v[xRegister] = value;
+    _v[xRegister] += value;
     return true;
 }
 
@@ -489,7 +504,7 @@ bool Chip8Processor::SetRandom(uint8_t xRegister, uint8_t mask)
 
 bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t sizeInBytes)
 {
-    LOG("%s: V%u, V%u, %u", __FUNCTION__, xRegister, yRegister, sizeInBytes);
+    LOG("%s: V%u=%d, V%u=%d, %u", __FUNCTION__, xRegister, _v[xRegister], yRegister, _v[yRegister], sizeInBytes);
     if (sizeInBytes > 15)
     {
         return false;
@@ -505,7 +520,6 @@ bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t si
         uint8_t row = _RAM[_I + i];
         for (uint8_t xPos = 0; xPos < 8; xPos++)
         {
-            mask >>= xPos;
             bool shouldFlip = ((row & mask) != 0);
             if (shouldFlip)
             {
@@ -514,6 +528,7 @@ bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t si
                     _v[15] = 1;  // Set VF if a set pixel was unset
                 }
             }
+            mask >>= 1;
         }
         y++;
     }
@@ -548,18 +563,22 @@ bool Chip8Processor::WaitAndStoreKey(uint8_t xRegister)
 bool Chip8Processor::SetDelayTimer(uint8_t xRegister)
 {
     LOG("%s: V%u", __FUNCTION__, xRegister);
+    _timerLock.lock();
     _delayTimer = _v[xRegister];
+    _timerLock.unlock();
     return true;
 }
 
 bool Chip8Processor::SetSoundTimer(uint8_t xRegister)
 {
     LOG("%s: V%u", __FUNCTION__, xRegister);
+    _timerLock.lock();
     _soundTimer = _v[xRegister];
     if (_soundTimer > 0)
     {
         _beeper->StartBeeping();
     }
+    _timerLock.unlock();
     return true;
 }
 

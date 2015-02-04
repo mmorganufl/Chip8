@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#define LOG_TAG "Keyboard"
+#include "log.h"
 namespace chip8
 {
 

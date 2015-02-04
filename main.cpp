@@ -3,43 +3,40 @@
 #include "Display.h"
 #include "Beeper.h"
 #include <iostream>
-int main()
+#include <fstream>
+
+
+#define LOG_TAG "main"
+#include "log.h"
+
+int main(int argc, char* argv[])
 {
-    chip8::Display* disp = new chip8::Display();
-    chip8::Chip8Processor proc(NULL, NULL, NULL);
-
-    int x = 1;
-    int y = 1;
-    char c = 0;
-    while (c != 'q')
+    if (argc != 2)
     {
-        c = getch();
-        switch (c)
-        {
-            case 'w':
-                y--;
-                break;
-
-            case 'a':
-                x--;
-                break;
-
-            case 's':
-                y++;
-                break;
-
-            case 'd':
-                x++;
-                break;
-
-            case 'c':
-                disp->Clear();
-                continue;
-        }
-        disp->FlipPixel(x, y);
+        LOG("You must specify a file!");
+        exit(-1);
     }
-    delete disp;
+    char* romPath = argv[1];
+    LOG("Loading %s", romPath);
+    chip8::Display* disp = new chip8::Display();
+    LOG("Creating keyboard");
+    chip8::Keyboard* kb = new chip8::Keyboard();
+    LOG("Creating beeper");
+    chip8::Beeper* beeper = new chip8::Beeper();
+    LOG("Creating processor");
+    chip8::Chip8Processor* proc = new chip8::Chip8Processor(kb, disp, beeper);
 
-
-
+    std::ifstream romFile(romPath, std::ifstream::binary);
+    uint8_t buffer[3584] = {0};  // Max file size
+    romFile.read((char*)buffer, 3584);
+    LOG("Loading rom");
+    proc->LoadRom(buffer, 3584);
+    LOG("Resetting processor");
+    proc->Reset();
+    LOG("Run!");
+    proc->Run();
+    while (proc->IsRunning())
+    {
+       std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }

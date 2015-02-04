@@ -106,6 +106,7 @@ protected:
     // True when execution thread is running
     bool                _run;
     std::mutex          _runLock;
+    std::mutex          _timerLock;
     std::thread*        _runThread;
     std::thread*        _timerThread;
     Keyboard*           _keyboard;

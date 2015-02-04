@@ -1,9 +1,14 @@
 #include "Display.h"
+#include <chrono>
+
+#define LOG_TAG "Display"
+#include "log.h"
 
 namespace chip8
 {
 
 Display::Display()
+: _refreshRun(true)
 {
     initscr();
     cbreak();
@@ -11,10 +16,14 @@ Display::Display()
     curs_set(0);
     _win = newwin(DISP_HEIGHT+2, DISP_WIDTH+2, 0, 0);
     DrawBorder();
+    _refreshThread = new std::thread(&Display::RefreshThread, this);
 }
 
 Display::~Display()
 {
+    _refreshRun = false;
+    _refreshThread->join();
+    delete _refreshThread;
     endwin();
 }
 
@@ -34,8 +43,11 @@ void Display::Clear()
 
 bool Display::FlipPixel(uint8_t x, uint8_t y)
 {
-    bool isSet = _pixels[x][y];
-    _pixels[x][y] = isSet ^ true;
+    LOG("%s", __FUNCTION__);
+    x %= DISP_WIDTH;
+    y %= DISP_HEIGHT;
+    bool isSet = _pixels[y][x];
+    _pixels[y][x] = isSet ^ true;
     if (isSet)
     {
         mvwaddch(_win, y+1, x+1, ' ');
@@ -44,8 +56,17 @@ bool Display::FlipPixel(uint8_t x, uint8_t y)
     {
         mvwaddch(_win, y+1, x+1, ACS_BLOCK);
     }
-    refresh();
-    wrefresh(_win);
+   // wrefresh(_win);
     return isSet;
+}
+
+void Display::RefreshThread()
+{
+    while (_refreshRun)
+    {
+        std::chrono::milliseconds period(40);
+        std::this_thread::sleep_for(period);
+        wrefresh(_win);
+    }
 }
 } /* namespace chip8 */

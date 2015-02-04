@@ -1,11 +1,7 @@
-/*
- * Beeper.cpp
- *
- *  Created on: Feb 1, 2015
- *      Author: user
- */
-
 #include "Beeper.h"
+
+#define LOG_TAG "Beeper"
+#include "log.h"
 
 namespace chip8
 {
