@@ -54,7 +54,7 @@ bool Display::FlipPixel(uint8_t x, uint8_t y)
     }
     else
     {
-        mvwaddch(_win, y+1, x+1, ACS_BLOCK);
+        mvwaddch(_win, y+1, x+1, '\xFE');
     }
    // wrefresh(_win);
     return isSet;

@@ -129,7 +129,7 @@ void Chip8Processor::ExecutionThread()
             LOG("The instruction failed to execute properly");
             return;
         }
-        std::chrono::microseconds period(10);
+        std::chrono::microseconds period(200);
         std::this_thread::sleep_for(period);
     }
     return;
@@ -150,6 +150,7 @@ void Chip8Processor::TimerThread()
     LOG("Starting timer thread");
     while(_run)
     {
+        LOG("tick!");
         _timerLock.lock();
         _delayTimer--;
         if (_delayTimer <= 0)
@@ -345,14 +346,14 @@ bool Chip8Processor::HandleInstruction(uint16_t instruction)
 // Instructions
 bool Chip8Processor::ClearScreen()
 {
-    LOG("%s", __FUNCTION__);
+    LOG_RED("%s", __FUNCTION__);
     _display->Clear();
     return true;
 }
 
 bool Chip8Processor::Return()
 {
-    LOG("%s", __FUNCTION__);
+    LOG_RED("%s", __FUNCTION__);
     _pc = *((uint16_t*)(_RAM +_sp));
     _sp += 2;
     return (_sp <= STACK_OFFSET);
@@ -360,27 +361,28 @@ bool Chip8Processor::Return()
 
 bool Chip8Processor::Jump(uint16_t address)
 {
-    LOG("%s: %x", __FUNCTION__, address);
+    LOG_RED("%s: %x", __FUNCTION__, address);
     _pc = address;
     return true;
 }
 
 bool Chip8Processor::Call(uint16_t address)
 {
-    LOG("%s: %x", __FUNCTION__, address);
+    LOG_RED("%s: %x", __FUNCTION__, address);
     _sp -= 2;
-    *((uint16_t*)(_RAM + _sp)) = _pc + 2;
+    *((uint16_t*)(_RAM + _sp)) = _pc;
     _pc = address;
     return (_sp >= (Chip8Processor::STACK_OFFSET - (2 * STACK_DEPTH)));
 }
 
 bool Chip8Processor::SkipValue(uint8_t xRegister, uint8_t value, bool ifEqual)
 {
-    LOG("%s: V%u, %u, %s", __FUNCTION__, xRegister, value, ifEqual ? "true" : "false");
-
+    LOG_RED("%s: V%u, %u, %s", __FUNCTION__, xRegister, value, ifEqual ? "true" : "false");
+    LOG("v%d = %d", xRegister, _v[xRegister]);
     bool isEqual = (_v[xRegister] == value);
     if (isEqual == ifEqual)
     {
+        LOG("skipping");
         _pc += 2;
     }
     return true;
@@ -388,7 +390,7 @@ bool Chip8Processor::SkipValue(uint8_t xRegister, uint8_t value, bool ifEqual)
 
 bool Chip8Processor::SkipXY(uint8_t xRegister, uint8_t yRegister, bool ifEqual)
 {
-    LOG("%s: V%u, V%u, %s", __FUNCTION__, xRegister, yRegister, ifEqual ? "true" : "false");
+    LOG_RED("%s: V%u, V%u, %s", __FUNCTION__, xRegister, yRegister, ifEqual ? "true" : "false");
     bool isEqual = (_v[xRegister] == _v[yRegister]);
     if (isEqual == ifEqual)
     {
@@ -399,21 +401,21 @@ bool Chip8Processor::SkipXY(uint8_t xRegister, uint8_t yRegister, bool ifEqual)
 
 bool Chip8Processor::SetByValue(uint8_t xRegister, uint8_t value)
 {
-    LOG("%s: V%u, %u", __FUNCTION__, xRegister, value);
+    LOG_RED("%s: V%u, %u", __FUNCTION__, xRegister, value);
     _v[xRegister] = value;
     return true;
 }
 
 bool Chip8Processor::AddToRegister(uint8_t xRegister, uint8_t value)
 {
-    LOG("%s: V%u, %u", __FUNCTION__, xRegister, value);
+    LOG_RED("%s: V%u, %u", __FUNCTION__, xRegister, value);
     _v[xRegister] += value;
     return true;
 }
 
 bool Chip8Processor::Math(uint8_t xRegister, uint8_t yRegister, MathCode code)
 {
-    LOG("%s: V%u, V%u, code:%u", __FUNCTION__, xRegister, yRegister, (uint8_t)code);
+    LOG_RED("%s: V%u, V%u, code:%u", __FUNCTION__, xRegister, yRegister, (uint8_t)code);
     switch (code)
     {
         case Chip8Processor::MATH_ADD:
@@ -487,14 +489,14 @@ bool Chip8Processor::Math(uint8_t xRegister, uint8_t yRegister, MathCode code)
 
 bool Chip8Processor::SetIRegister(uint16_t value)
 {
-    LOG("%s: %u", __FUNCTION__, value);
+    LOG_RED("%s: %u", __FUNCTION__, value);
     _I = value;
     return true;
 }
 
 bool Chip8Processor::SetRandom(uint8_t xRegister, uint8_t mask)
 {
-    LOG("%s: V%u, %x", __FUNCTION__, xRegister, mask);
+    LOG_RED("%s: V%u, %x", __FUNCTION__, xRegister, mask);
     std::default_random_engine randEng(_rand());
     std::uniform_int_distribution<int> uniformDist(0, 255);
     uint8_t rnd = uniformDist(randEng);
@@ -504,9 +506,10 @@ bool Chip8Processor::SetRandom(uint8_t xRegister, uint8_t mask)
 
 bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t sizeInBytes)
 {
-    LOG("%s: V%u=%d, V%u=%d, %u", __FUNCTION__, xRegister, _v[xRegister], yRegister, _v[yRegister], sizeInBytes);
+    LOG_RED("%s: V%u=%d, V%u=%d, I=%u, %u", __FUNCTION__, xRegister, _v[xRegister], yRegister, _v[yRegister], _I, sizeInBytes);
     if (sizeInBytes > 15)
     {
+        LOG("Size too big!");
         return false;
     }
     _v[15] = 0;  // Assume no pixels are flipped
@@ -537,7 +540,7 @@ bool Chip8Processor::DrawSprite(uint8_t xRegister, uint8_t yRegister, uint8_t si
 
 bool Chip8Processor::SkipKeyPress(uint8_t xRegister, bool ifIsPressed)
 {
-    LOG("%s: V%u, %s", __FUNCTION__, xRegister, ifIsPressed ? "true":"false");
+    LOG_RED("%s: V%u, %s", __FUNCTION__, xRegister, ifIsPressed ? "true":"false");
     bool keyIsPressed = _keyboard->IsKeyDown(_v[xRegister]);
     if (keyIsPressed == ifIsPressed)
     {
@@ -548,21 +551,22 @@ bool Chip8Processor::SkipKeyPress(uint8_t xRegister, bool ifIsPressed)
 
 bool Chip8Processor::StoreDelayTimer(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _v[xRegister] = _delayTimer;
+    LOG("DelayTimer = %d", _delayTimer);
     return true;
 }
 
 bool Chip8Processor::WaitAndStoreKey(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _v[xRegister] = _keyboard->WaitForKey();
     return true;
 }
 
 bool Chip8Processor::SetDelayTimer(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _timerLock.lock();
     _delayTimer = _v[xRegister];
     _timerLock.unlock();
@@ -571,7 +575,7 @@ bool Chip8Processor::SetDelayTimer(uint8_t xRegister)
 
 bool Chip8Processor::SetSoundTimer(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _timerLock.lock();
     _soundTimer = _v[xRegister];
     if (_soundTimer > 0)
@@ -584,21 +588,21 @@ bool Chip8Processor::SetSoundTimer(uint8_t xRegister)
 
 bool Chip8Processor::AddToI(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _I = _I + _v[xRegister];
     return true;
 }
 
 bool Chip8Processor::SetIToChar(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     _I =  5 * _v[xRegister];
     return true;
 }
 
 bool Chip8Processor::StoreBCD(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     uint8_t value = _v[xRegister];
 
     // Most significant digit
@@ -616,7 +620,7 @@ bool Chip8Processor::StoreBCD(uint8_t xRegister)
 
 bool Chip8Processor::StoreRegs(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     for (uint8_t i = 0; i <= xRegister; i++)
     {
         _RAM[_I + i] = _v[i];
@@ -626,7 +630,7 @@ bool Chip8Processor::StoreRegs(uint8_t xRegister)
 
 bool Chip8Processor::FillRegs(uint8_t xRegister)
 {
-    LOG("%s: V%u", __FUNCTION__, xRegister);
+    LOG_RED("%s: V%u", __FUNCTION__, xRegister);
     for (uint8_t i = 0; i <= xRegister; i++)
     {
         _v[i] = _RAM[_I + i];
