@@ -1,4 +1,5 @@
 #include "Display.h"
+#include <string.h>
 #include <chrono>
 
 #define LOG_TAG "Display"
@@ -39,6 +40,7 @@ void Display::Clear()
 {
     wclear(_win);
     DrawBorder();
+    memset(_pixels, 0, sizeof(_pixels));
 }
 
 bool Display::FlipPixel(uint8_t x, uint8_t y)
@@ -56,7 +58,6 @@ bool Display::FlipPixel(uint8_t x, uint8_t y)
     {
         mvwaddch(_win, y+1, x+1, '\xFE');
     }
-   // wrefresh(_win);
     return isSet;
 }
 
@@ -67,6 +68,7 @@ void Display::RefreshThread()
         std::chrono::milliseconds period(40);
         std::this_thread::sleep_for(period);
         wrefresh(_win);
+        refresh();
     }
 }
 } /* namespace chip8 */

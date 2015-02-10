@@ -2,6 +2,7 @@
 #define BEEPER_H_
 
 #include <mutex>
+#include <thread>
 
 namespace chip8
 {
@@ -14,10 +15,13 @@ namespace chip8
 
         bool StartBeeping();
         bool StopBeeping();
+        void BeepThread();
 
     protected:
-        std::mutex _beepLock;
-        bool _isBeeping;
+        std::mutex      _beepLock;
+        bool            _isBeeping;
+        std::thread*    _beepThread;
+        bool            _isAlive;
     };
 
 } /* namespace chip8 */

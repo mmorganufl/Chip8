@@ -129,7 +129,7 @@ void Chip8Processor::ExecutionThread()
             LOG("The instruction failed to execute properly");
             return;
         }
-        std::chrono::microseconds period(200);
+        std::chrono::microseconds period(500);
         std::this_thread::sleep_for(period);
     }
     return;
@@ -560,7 +560,10 @@ bool Chip8Processor::StoreDelayTimer(uint8_t xRegister)
 bool Chip8Processor::WaitAndStoreKey(uint8_t xRegister)
 {
     LOG_RED("%s: V%u", __FUNCTION__, xRegister);
-    _v[xRegister] = _keyboard->WaitForKey();
+    do {
+        _v[xRegister] = _keyboard->WaitForKey();
+    } while ((_v[xRegister] != 0x10) && _run);
+
     return true;
 }
 
