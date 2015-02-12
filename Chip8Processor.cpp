@@ -152,17 +152,20 @@ void Chip8Processor::TimerThread()
     {
         LOG("tick!");
         _timerLock.lock();
-        _delayTimer--;
-        if (_delayTimer <= 0)
+
+        if (_delayTimer != 0)
         {
-            _delayTimer = 0;
+            _delayTimer--;
         }
 
-        _soundTimer--;
-        if (_soundTimer <= 0)
+
+        if (_soundTimer != 0)
         {
-            _soundTimer = 0;
-            _beeper->StopBeeping();
+            _soundTimer--;
+            if (_soundTimer == 0)
+            {
+                _beeper->StopBeeping();
+            }
         }
         _timerLock.unlock();
         std::chrono::microseconds period(16666);
